@@ -1,4 +1,7 @@
 #r @"packages/build/FAKE/tools/FakeLib.dll"
+#r @"packages/build/FSharp.Compiler.Service/lib/net45/FSharp.Compiler.Service.dll"
+#r "packages/build/Fantomas/lib/FantomasLib.dll"
+// #load @".paket/load/net462/build/Fantomas.fsx"
 open Fake
 open Fake.Git
 open Fake.AssemblyInfoFile
@@ -6,10 +9,34 @@ open Fake.ReleaseNotesHelper
 open Fake.UserInputHelper
 open System
 
+open Fantomas.FakeHelpers
+open Fantomas.FormatConfig
+
 let release = LoadReleaseNotes "RELEASE_NOTES.md"
 let sln = "MyLib.sln"
 let srcGlob = "src/**/*.fsproj"
 let testsGlob = "tests/**/*.fsproj"
+
+let fantomasConfig =
+    { FormatConfig.Default with
+            IndentSpaceNum = 2
+            PageWidth = 3
+            StrictMode = true
+            ReorderOpenDeclaration = true }
+
+Target "CheckCodeFormat" (fun _ ->
+    !! "src/**/*.fs"
+    ++ "tests/**/*.fs"
+    |> checkCode fantomasConfig
+)
+
+Target "FormatCode" (fun _ ->
+    !! "src/**/*.fs"
+    ++ "tests/**/*.fs"
+    |> formatCode fantomasConfig
+    |> Log "Formatted files: "
+)
+
 
 Target "Clean" (fun _ ->
     ["bin"; "temp" ;"dist"]
@@ -45,6 +72,8 @@ Target "DotnetBuild" (fun _ ->
                     "--no-restore"
                 ]
         }))
+
+
 
 let invoke f = f ()
 let invokeAsync f = async { f () }

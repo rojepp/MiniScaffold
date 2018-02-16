@@ -7,6 +7,10 @@ nuget FSharp.Core 4.3.3
 nuget Expecto 5.1.2
 nuget SourceLink.Create.CommandLine 2.7.2 copy_local: true
 
-group Build
-    source https://www.nuget.org/api/v2
-    nuget FAKE
+group build
+  generate_load_scripts: true
+  framework: net462
+  source https://www.nuget.org/api/v2
+  nuget FAKE
+  nuget Fantomas
+  nuget FSharp.Compiler.Service 11.0.4
