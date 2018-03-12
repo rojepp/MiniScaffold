@@ -75,9 +75,9 @@ then
 fi
 
 # build template
-pushd Content/
-./build.sh
-./build.sh Clean
-popd
+# pushd Content/
+# ./build.sh
+# ./build.sh Clean
+# popd
 
 run $FAKE_EXE "$@" $FSIARGS $FSIARGS2 build.fsx

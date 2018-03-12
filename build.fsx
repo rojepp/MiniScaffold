@@ -1,4 +1,5 @@
 #r @"packages/build/FAKE/tools/FakeLib.dll"
+open System.IO
 open Fake
 open Fake.Git
 open Fake.AssemblyInfoFile
@@ -55,6 +56,70 @@ Target "Publish" (fun _ ->
         )
 )
 
+
+let dispose (disposable : #IDisposable) = disposable.Dispose()
+[<AllowNullLiteral>]
+type DisposableDirectory (directory : string) =
+    do
+        tracefn "Created disposable directory %s" directory
+    static member Create() =
+        let tempPath = IO.Path.Combine(IO.Path.GetTempPath(), Guid.NewGuid().ToString("n"))
+        IO.Directory.CreateDirectory tempPath |> ignore
+
+        new DisposableDirectory(tempPath)
+    member x.Directory = directory
+    member x.DirectoryInfo = IO.DirectoryInfo(directory)
+
+    interface IDisposable with
+        member x.Dispose() =
+            tracefn "Deleting directory %s" directory
+            IO.Directory.Delete(x.Directory,true)
+
+type DisposeablePushd (directory : string) =
+    do FileUtils.pushd directory
+    interface IDisposable with
+        member x.Dispose() =
+            FileUtils.popd()
+
+
+Target "IntegrationTests" (fun _ ->
+    // uninstall current MiniScaffold
+    DotNetCli.RunCommand id
+        "new -u MiniScaffold"
+    // install from dist/
+    DotNetCli.RunCommand id
+        "new -i dist/MiniScaffold.0.6.1.nupkg"
+
+    // new mini-scaffold
+    [
+        "-n MyCoolLib --githubUsername CoolPersonNo2", "DotnetPack"
+        "-n MyCoolLib --githubUsername CoolPersonNo2 --outputType Library", "DotnetPack"
+        "-n MyCoolExe --githubUsername CoolPersonNo2 --outputType Exe", "DotnetPack"
+    ]
+    |> Seq.iter(fun (param, testTarget) ->
+        use directory = DisposableDirectory.Create()
+        use pushd1 = new DisposeablePushd(directory.Directory)
+        DotNetCli.RunCommand (fun commandParams ->
+            { commandParams with WorkingDir = directory.Directory}
+        )
+            <| sprintf "new mini-scaffold -lang F# %s" param
+        use pushd2 =
+            directory.DirectoryInfo.GetDirectories ()
+            |> Seq.head
+            |> string
+            |> fun x -> new DisposeablePushd(x)
+        let ok =
+            ProcessHelper.execProcess (fun psi ->
+                psi.FileName <- "./build.sh"
+                psi.Arguments <- sprintf "%s -nc" testTarget
+                psi.WorkingDirectory <- directory.Directory
+                ) (TimeSpan.FromMinutes(5.))
+        if not ok then
+            failwithf "Intregration test failed with params %s" param
+    )
+
+)
+
 Target "Release" (fun _ ->
 
     if Git.Information.getBranchName "" <> "master" then failwith "Not on master"
@@ -72,6 +137,7 @@ Target "Release" (fun _ ->
 "Clean"
   ==> "DotnetRestore"
   ==> "DotnetPack"
+  ==> "IntegrationTests"
   ==> "Publish"
   ==> "Release"
 
