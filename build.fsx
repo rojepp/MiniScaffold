@@ -88,7 +88,7 @@ Target "IntegrationTests" (fun _ ->
         "new -u MiniScaffold"
     // install from dist/
     DotNetCli.RunCommand id
-        "new -i dist/MiniScaffold.0.6.1.nupkg"
+        <| sprintf "new -i dist/MiniScaffold.%s.nupkg" release.NugetVersion
 
     // new mini-scaffold
     [
@@ -110,7 +110,7 @@ Target "IntegrationTests" (fun _ ->
             |> fun x -> new DisposeablePushd(x)
         let ok =
             ProcessHelper.execProcess (fun psi ->
-                psi.FileName <- "./build.sh"
+                psi.FileName <- if isMono "./build.sh" then else ".\build.cmd"
                 psi.Arguments <- sprintf "%s -nc" testTarget
                 psi.WorkingDirectory <- directory.Directory
                 ) (TimeSpan.FromMinutes(5.))
