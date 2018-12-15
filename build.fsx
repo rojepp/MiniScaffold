@@ -28,6 +28,10 @@ let srcGlob = "*.csproj"
 let distDir = __SOURCE_DIRECTORY__  @@ "dist"
 let distGlob = distDir @@ "*.nupkg"
 
+let docsDir = __SOURCE_DIRECTORY__ @@ "docs"
+let docsSrcDir = __SOURCE_DIRECTORY__ @@ "docsSrc"
+let docsSrcGlob = docsSrcDir @@ "*.fsx"
+
 let gitOwner = "TheAngryByrd"
 let gitRepoName = "MiniScaffold"
 
@@ -165,8 +169,28 @@ Target.create "IntegrationTests" <| fun _ ->
     )
 
 open FSharp.Literate
+open Fable.Helpers.React
+open Fable.Helpers.React.Props
+
+let template titletext bodytext =
+    html [Lang "en"] [
+        head [] [
+            title [] [ str ("My blog / " + titletext) ]
+        ]
+        body [] [
+            RawText bodytext
+        ]
+    ]
+
+let render html =
+  fragment [] [
+    RawText "<!doctype html>"
+    RawText "\n"
+    html ]
+  |> Fable.Helpers.ReactServer.renderToString
 
 Target.create "GenerateDocs" <| fun _ ->
+    // This finds the current fsharp.core version of your solution to use for fsharp.literate
     let lockFile = Paket.LockFile.LoadFrom Paket.Constants.LockFileName
     let packageName = Paket.Domain.PackageName "FSharp.Core"
     let (_,package,version) =
@@ -176,8 +200,6 @@ Target.create "GenerateDocs" <| fun _ ->
         )
         |> Seq.maxBy(fun (_,_,semver) -> semver)
     let fsharpCoreDir = Paket.NuGetCache.GetTargetUserFolder package version </> "lib" </> "netstandard1.6"
-
-
     let parse source =
         let doc =
           let fsharpCoreDir = sprintf "-I:%s" fsharpCoreDir
@@ -191,21 +213,27 @@ Target.create "GenerateDocs" <| fun _ ->
         Formatting.format doc.MarkdownDocument true OutputKind.Html
 
 
-    let snipet  =
-        """
-        (** # *F# literate* in action *)
-        printfn "Hello"
-        """
-    let fs =
-        snipet
-        |> parse
-        |> format
-    printfn "%s" fs
-    // let md =
-    //     """# Markdown is cool
-    //     especially with *FSharp.Formatting* ! """
-    //     |> FSharp.Markdown.Markdown.TransformHtml
-    // printfn "%s" md
+
+    !! docsSrcGlob
+    |> Seq.iter(fun filePath ->
+        let file = IO.File.ReadAllLines filePath |> String.concat "\n"
+        let outPath =
+            filePath.Replace(docsSrcDir, docsDir).Replace(".fsx", ".html")
+        let fs =
+            file
+            |> parse
+            |> format
+        let contents =
+            fs
+            |> template "foo"
+            |> render
+        IO.File.WriteAllText(outPath, fs)
+
+    )
+
+
+Target.create "ServeDocs" <| fun _ ->
+    ()
 
 Target.create "Publish" <| fun _ ->
     Paket.push(fun c ->
