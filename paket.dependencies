@@ -4,16 +4,21 @@ source https://www.nuget.org/api/v2
 // [ FAKE GROUP ]
 group Build
   source https://www.nuget.org/api/v2
-    nuget Fake.IO.FileSystem
-    nuget Fake.Core.Target
-    nuget Fake.Core.ReleaseNotes
-    nuget FAKE.Core.Environment
-    nuget Fake.DotNet.Cli
-    nuget FAKE.Core.Process
-    nuget Fake.DotNet.AssemblyInfoFile
-    nuget Fake.Tools.Git
-    nuget Fake.DotNet.Paket
-    nuget Fake.Api.GitHub
+  source https://ci.appveyor.com/nuget/fsharp-formatting
+  nuget FSharp.Core 4.5.4
+  nuget Fake.IO.FileSystem
+  nuget Fake.Core.Target
+  nuget Fake.Core.ReleaseNotes
+  nuget FAKE.Core.Environment
+  nuget Fake.DotNet.Cli
+  nuget FAKE.Core.Process
+  nuget Fake.DotNet.AssemblyInfoFile
+  nuget Fake.Tools.Git
+  nuget Fake.DotNet.Paket
+  nuget Fake.Api.GitHub
+  nuget FSharp.Literate
+  nuget Fable.React
+  nuget Paket.Core
 
-    nuget Fake.BuildServer.AppVeyor
-    nuget Fake.BuildServer.Travis
+  nuget Fake.BuildServer.AppVeyor
+  nuget Fake.BuildServer.Travis
