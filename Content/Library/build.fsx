@@ -1,4 +1,5 @@
 #load ".fake/build.fsx/intellisense.fsx"
+#load "./docs.fsx"
 #if !FAKE
 #r "Facades/netstandard"
 #r "netstandard"
@@ -14,6 +15,8 @@ open Fake.IO.Globbing.Operators
 open Fake.Core.TargetOperators
 open Fake.Api
 open Fake.BuildServer
+
+
 
 BuildServer.install [
     AppVeyor.Installer
@@ -316,6 +319,9 @@ Target.create "FormatCode" <| fun _ ->
     )
 
 Target.create "Release" ignore
+
+Target.create "ServeDocs" <| fun _ ->
+    Docs.serveDocs ()
 
 // Only call Clean if DotnetPack was in the call chain
 // Ensure Clean is called before DotnetRestore
