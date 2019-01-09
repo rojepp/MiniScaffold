@@ -1,3 +1,4 @@
+open Docs
 #load ".fake/build.fsx/intellisense.fsx"
 #load "./docs.fsx"
 #if !FAKE
@@ -320,6 +321,9 @@ Target.create "FormatCode" <| fun _ ->
 
 Target.create "Release" ignore
 
+Target.create "GenerateDocs" <| fun _ ->
+    Docs.generateDocs gitRepoName
+
 Target.create "ServeDocs" <| fun _ ->
     Docs.serveDocs ()
 
@@ -333,6 +337,9 @@ Target.create "ServeDocs" <| fun _ ->
 "DotnetRestore" ?=> "AssemblyInfo"
 "AssemblyInfo" ?=> "DotnetBuild"
 "AssemblyInfo" ==> "Publish"
+
+"GenerateDocs"
+  ==> "ServeDocs"
 
 "DotnetRestore"
   ==> "DotnetBuild"
