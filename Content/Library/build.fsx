@@ -324,10 +324,11 @@ Target.create "FormatCode" <| fun _ ->
 Target.create "Release" ignore
 
 Target.create "GenerateDocs" <| fun _ ->
-    Docs.generateDocs gitRepoName
+    Docs.generateDocs Docs.docsFileGlob gitRepoName
     Docs.generateAPI gitRepoName (!! srcBinGlob)
 
 Target.create "ServeDocs" <| fun _ ->
+    use d = Docs.watchDocs gitRepoName
     Docs.serveDocs ()
 
 

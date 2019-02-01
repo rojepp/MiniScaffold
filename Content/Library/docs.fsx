@@ -2,6 +2,11 @@ open FSharp.Literate
 open System.Collections.Generic
 open System.Reflection
 open Fable.Import.React
+open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.Http
+open System.Net.WebSockets
+open System.Net.WebSockets
+open System.Threading
 #load ".fake/build.fsx/intellisense.fsx"
 #load "./docsSrc/templates/master.fsx"
 #load "./docsSrc/templates/modules.fsx"
@@ -34,6 +39,13 @@ let docsDir = __SOURCE_DIRECTORY__ @@ "docs"
 let docsApiDir = docsDir @@ "api"
 let docsSrcDir = __SOURCE_DIRECTORY__ @@ "docsSrc"
 let docsSrcGlob = docsSrcDir @@ "**/*.fsx"
+
+let refereshWebpageEvent = new Event<string>()
+
+
+let docsFileGlob =
+    !! docsSrcGlob
+    -- (docsSrcDir @@ "templates/*") // Don't want to generate from html templates
 
 let render html =
     fragment [] [
@@ -130,7 +142,7 @@ let copyAssets () =
 
 
 
-let generateDocs githubRepoName =
+let generateDocs (docSourcePaths : IGlobbingPattern) githubRepoName =
     // This finds the current fsharp.core version of your solution to use for fsharp.literate
     let fsharpCoreDir = locateDLL "FSharp.Core" "netstandard1.6"
 
@@ -138,6 +150,7 @@ let generateDocs githubRepoName =
         let doc =
             let fsharpCoreDir = sprintf "-I:%s" fsharpCoreDir
             let systemRuntime = "-r:System.Runtime"
+            //TODO: possibly make a global so we don't have the spinup cost everytime we call
             Literate.ParseScriptString(
                 source,
                 path = fileName,
@@ -156,8 +169,7 @@ let generateDocs githubRepoName =
     let relativePaths = Nav.generateNav githubRepoName
 
 
-    !! docsSrcGlob
-    -- (docsSrcDir @@ "templates/*")
+    docSourcePaths
     |> Seq.iter(fun filePath ->
         Fake.Core.Trace.tracefn "Rendering %s" filePath
         let file = IO.File.ReadAllText filePath
@@ -184,6 +196,16 @@ let generateDocs githubRepoName =
 
     copyAssets()
 
+
+let watchDocs githubRepoName =
+    docsFileGlob
+    |> ChangeWatcher.run (fun changes ->
+        changes
+        |> Seq.iter (fun m ->
+            generateDocs (!! m.FullPath) githubRepoName
+            refereshWebpageEvent.Trigger m.FullPath
+        )
+    )
 
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
@@ -212,6 +234,37 @@ let waitForPortInUse (hostname : string) port =
         with e ->
             client.Close()
 
+
+let createWebsocket (httpContext : HttpContext) (next : unit -> Async<unit>) = async {
+    if httpContext.WebSockets.IsWebSocketRequest then
+        let! websocket = httpContext.WebSockets.AcceptWebSocketAsync() |> Async.AwaitTask
+        use d =
+            refereshWebpageEvent.Publish
+            |> Observable.subscribe (fun m ->
+                let segment = ArraySegment<byte>(m |> Text.Encoding.UTF8.GetBytes)
+                websocket.SendAsync(segment, WebSocketMessageType.Text, true, CancellationToken.None)
+                |> Async.AwaitTask
+                |> Async.Start
+
+            )
+        while websocket.State <> WebSocketState.Closed do
+            do! Async.Sleep(100)
+    else
+        do! next ()
+}
+
+let useAsync (middlware : HttpContext -> (unit -> Async<unit>) -> Async<unit>) (app:IApplicationBuilder) =
+    app.Use(fun env next ->
+        middlware env (next.Invoke >> Async.AwaitTask)
+        |> Async.StartAsTask
+        :> System.Threading.Tasks.Task
+    )
+
+let configureWebsocket (appBuilder : IApplicationBuilder) =
+    appBuilder.UseWebSockets()
+    |> useAsync (createWebsocket)
+    |> ignore
+
 let startWebserver (url : string) =
     WebHostBuilder()
         .UseKestrel()
@@ -222,6 +275,7 @@ let startWebserver (url : string) =
                     FileProvider =  new PhysicalFileProvider(docsDir)
                 )
             app.UseStaticFiles(opts) |> ignore
+            configureWebsocket app
         )
         .Build()
         .Run()
