@@ -1,6 +1,14 @@
 # MiniScaffold
 F# Template for creating and publishing libraries targeting .NET Full (net461) and Core (netstandard2.0)
 
+Wha
+
+![](https://github.com/rojepp/MiniScaffold/workflows/Build%20master/badge.svg)
+
+relative: 
+
+![](workflows/Build%20master/badge.svg)
+
 ## Builds
 
 MacOS/Linux | Windows
